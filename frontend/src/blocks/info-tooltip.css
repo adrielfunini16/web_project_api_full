@@ -1,0 +1,29 @@
+.info-tooltip__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  row-gap: 32px;
+}
+
+.info-tooltip__icon {
+  max-width: 120px;
+  width: 100%;
+}
+
+.info-tooltip__title {
+  font-family: "Inter", Arial, sans-serif;
+  font-weight: 900;
+  font-size: 24px;
+  text-align: center;
+}
+
+@media screen and (max-width: 480px) {
+  .info-tooltip__content {
+    row-gap: 25px;
+  }
+
+  .info-tooltip__title {
+    font-size: 20px;
+  }
+}
