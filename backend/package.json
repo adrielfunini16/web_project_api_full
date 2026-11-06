@@ -31,10 +31,13 @@
   "dependencies": {
     "bcrypt": "^6.0.0",
     "celebrate": "15.0.3",
+    "cors": "^2.8.6",
     "dotenv": "^18.0.9",
     "express": "^5.2.1",
+    "express-winston": "^4.2.0",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.10.3",
-    "validator": "^13.15.35"
+    "validator": "^13.15.35",
+    "winston": "^3.19.0"
   }
 }

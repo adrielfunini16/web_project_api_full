@@ -29,6 +29,10 @@ const errorHandler = (err, req, res, next) => {
     });
   }
 
+  if (err.status === 403) {
+    return res.status(403).json({ message: err.message });
+  }
+
   if (err.name === "MongoServerError" && err.code === 11000) {
     return res.status(409).json({ message: "Conflito de dados" });
   }

@@ -155,9 +155,8 @@ describe("POST /signin", () => {
   beforeEach(async () => {
     // Criar um usuário para o teste de login
     const response = await request(app).post("/signup").send(newUser);
-    if (response.status === 201) {
-      createdUserId = response.body._id;
-    }
+    expect(response.status).toBe(201);
+    createdUserId = response.body._id;
   });
 
   afterEach(async () => {
@@ -173,10 +172,12 @@ describe("POST /signin", () => {
       .post("/signin")
       .send({ email: newUser.email, password: newUser.password });
 
-    const decoded = jwt.verify(response.body.token, process.env.JWT_SECRET);
-
     expect(response.status).toBe(200);
     expect(response.body).toHaveProperty("token");
+    expect(typeof response.body.token).toBe("string");
+    expect(response.body.token.length).toBeGreaterThan(0);
+
+    const decoded = jwt.verify(response.body.token, process.env.JWT_SECRET);
     expect(decoded._id).toBe(createdUserId);
   });
 });

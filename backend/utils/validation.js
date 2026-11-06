@@ -1,7 +1,5 @@
-const urlRegex = /^(https?:\/\/)(www\.)?([a-zA-Z0-9-]+\.[a-zA-Z]{2,})(\/[a-zA-Z0-9._~:/?%#[\]@!$&'()*+,;=-]*\/?)?#?$/;
+const validator = require("validator");
 
-function isValidUrl(url) {
-  return urlRegex.test(url);
-}
+const isValidUrl = (value) => validator.isURL(value);
 
 module.exports = { isValidUrl };

@@ -11,6 +11,15 @@ const getUsers = (req, res, next) => {
     });
 };
 
+const getCurrentUser = (req, res, next) => {
+  User.findById(req.user._id)
+    .orFail()
+    .then((user) => res.send(user))
+    .catch((err) => {
+      next(err);
+    });
+};
+
 const getUserById = (req, res, next) => {
   User.findById(req.params.userId)
     .orFail()
@@ -39,12 +48,13 @@ const createUser = async (req, res, next) => {
 
 const login = async (req, res, next) => {
   const { email, password } = req.body;
-  const JWT_SECRET = process.env.JWT_SECRET;
 
   try {
     const user = await User.findUserByCredentials(email, password);
 
-    const token = jwt.sign({ _id: user._id }, JWT_SECRET, { expiresIn: "7d" });
+    const token = jwt.sign({ _id: user._id }, process.env.JWT_SECRET, {
+      expiresIn: "7d",
+    });
     res.send({ token });
   } catch (err) {
     next(err);
@@ -87,6 +97,7 @@ const updateAvatarUser = (req, res, next) => {
 
 module.exports = {
   getUsers,
+  getCurrentUser,
   getUserById,
   createUser,
   login,
