@@ -19,7 +19,7 @@ logger.on('error', () => {
   console.error('Não foi possível gravar o log HTTP');
 });
 
-const requestLogger = expressWinston.logger({
+const httpLogger = expressWinston.logger({
   winstonInstance: logger,
   statusLevels: true,
   msg: 'HTTP request',
@@ -31,7 +31,7 @@ const requestLogger = expressWinston.logger({
     return {
       method: req.method,
       // Usa o padrão da rota, nunca a URL recebida, IDs ou query strings.
-      route: req.route ? `${req.baseUrl}${req.route.path}` : 'unmatched',
+      route: res.locals.logRoute || 'unmatched',
       status: res.statusCode,
       durationMs: res.responseTime,
       ...(res.statusCode >= 400 && {
@@ -40,6 +40,25 @@ const requestLogger = expressWinston.logger({
     };
   },
 });
+
+const requestLogger = (req, res, next) => {
+  let matchedRoute = req.route;
+  // Captura o padrão antes de o Router restaurar baseUrl ao encaminhar um erro.
+  Object.defineProperty(req, 'route', {
+    configurable: true,
+    enumerable: true,
+    get() {
+      return matchedRoute;
+    },
+    set(route) {
+      matchedRoute = route;
+      if (route) {
+        res.locals.logRoute = `${req.baseUrl}${route.path}`;
+      }
+    },
+  });
+  httpLogger(req, res, next);
+};
 
 // Apenas classifica: a gravação ocorre uma vez, após o status final da resposta.
 const errorLogger = (err, req, res, next) => {

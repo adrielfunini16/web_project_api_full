@@ -1,7 +1,8 @@
-const User = require("../models/user");
-const bcrypt = require("bcrypt");
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const User = require('../models/user');
+
 const saltRounds = 10;
-const jwt = require("jsonwebtoken");
 
 const getUsers = (req, res, next) => {
   User.find({})
@@ -30,7 +31,9 @@ const getUserById = (req, res, next) => {
 };
 
 const createUser = async (req, res, next) => {
-  const { name, about, avatar, email, password } = req.body;
+  const {
+    name, about, avatar, email, password,
+  } = req.body;
   try {
     const hashedPassword = await bcrypt.hash(password, saltRounds);
     const newUser = await User.create({
@@ -53,7 +56,7 @@ const login = async (req, res, next) => {
     const user = await User.findUserByCredentials(email, password);
 
     const token = jwt.sign({ _id: user._id }, process.env.JWT_SECRET, {
-      expiresIn: "7d",
+      expiresIn: '7d',
     });
     res.send({ token });
   } catch (err) {
@@ -67,7 +70,7 @@ const updateProfileUser = (req, res, next) => {
   User.findByIdAndUpdate(
     userId,
     { name, about },
-    { returnDocument: "after", runValidators: true },
+    { returnDocument: 'after', runValidators: true },
   )
     .orFail()
     .then((updatedUser) => {
@@ -84,7 +87,7 @@ const updateAvatarUser = (req, res, next) => {
   User.findByIdAndUpdate(
     userId,
     { avatar },
-    { returnDocument: "after", runValidators: true },
+    { returnDocument: 'after', runValidators: true },
   )
     .orFail()
     .then((updatedUser) => {

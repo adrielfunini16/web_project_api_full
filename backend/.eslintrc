@@ -1,5 +1,10 @@
 {
   "extends": "airbnb-base",
+  "env": {
+    "node": true,
+    "jest": true,
+    "es2021": true,
+  },
   "rules": {
     "no-underscore-dangle": [
       "error",
@@ -9,4 +14,15 @@
     ],
     "no-console": "off",
   },
+
+  "overrides": [
+    {
+      "files": ["tests/**/*.test.js"],
+      "rules": {
+        "global-require": "off",
+        "no-await-in-loop": "off",
+        "no-restricted-syntax": "off",
+      },
+    },
+  ],
 }

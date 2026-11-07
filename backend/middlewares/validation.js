@@ -1,12 +1,12 @@
-const { celebrate, Joi, Segments } = require("celebrate");
-const { isValidUrl } = require("../utils/validation.js");
+const { celebrate, Joi, Segments } = require('celebrate');
+const { isValidUrl } = require('../utils/validation');
 
 const nameSchema = Joi.string().min(2).max(30);
 const objectIdSchema = Joi.string().hex().length(24);
 
 const isValidUrlSchema = Joi.string().custom((value, helpers) => {
   if (!isValidUrl(value)) {
-    return helpers.error("string.uri");
+    return helpers.error('string.uri');
   }
 
   return value;

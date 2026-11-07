@@ -1,8 +1,8 @@
-const bcrypt = require("bcrypt");
-const mongoose = require("mongoose");
-const validator = require("validator");
-const { isValidUrl } = require("../utils/validation");
-const UnauthorizedError = require("../errors/UnauthorizedError");
+const bcrypt = require('bcrypt');
+const mongoose = require('mongoose');
+const validator = require('validator');
+const { isValidUrl } = require('../utils/validation');
+const UnauthorizedError = require('../errors/UnauthorizedError');
 
 const userSchema = new mongoose.Schema({
   email: {
@@ -11,7 +11,7 @@ const userSchema = new mongoose.Schema({
     unique: true,
     validate: {
       validator: validator.isEmail,
-      message: "Email invalido",
+      message: 'Email invalido',
     },
   },
   password: {
@@ -23,22 +23,22 @@ const userSchema = new mongoose.Schema({
     type: String,
     minlength: 2,
     maxlength: 30,
-    default: "Jacques Cousteau",
+    default: 'Jacques Cousteau',
   },
   about: {
     type: String,
     minlength: 2,
     maxlength: 30,
-    default: "Explorer",
+    default: 'Explorer',
   },
   avatar: {
     type: String,
     validate: {
       validator: isValidUrl,
-      message: "URL invalida",
+      message: 'URL invalida',
     },
     default:
-      "https://practicum-content.s3.us-west-1.amazonaws.com/resources/moved_avatar_1604080799.jpg",
+      'https://practicum-content.s3.us-west-1.amazonaws.com/resources/moved_avatar_1604080799.jpg',
   },
 });
 
@@ -46,7 +46,7 @@ userSchema.statics.findUserByCredentials = async function findUserByCredentials(
   email,
   password,
 ) {
-  const user = await this.findOne({ email }).select("+password");
+  const user = await this.findOne({ email }).select('+password');
 
   if (!user) {
     throw new UnauthorizedError();
@@ -61,4 +61,4 @@ userSchema.statics.findUserByCredentials = async function findUserByCredentials(
   return user;
 };
 
-module.exports = mongoose.model("user", userSchema);
+module.exports = mongoose.model('user', userSchema);
