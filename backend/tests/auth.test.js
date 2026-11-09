@@ -12,6 +12,12 @@ const { MONGO_URI } = process.env;
 const runId = `${Date.now()}-${process.pid}`;
 
 beforeAll(async () => {
+  if (MONGO_URI !== 'mongodb://127.0.0.1:27017/around_test') {
+    throw new Error('MONGO_URI não corresponde ao banco de testes autorizado');
+  }
+  if (!process.env.JWT_SECRET) {
+    throw new Error('JWT_SECRET precisa estar configurado para os testes');
+  }
   await mongoose.connect(MONGO_URI, {
     serverSelectionTimeoutMS: 3000,
     runtimeAdapters: {

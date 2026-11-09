@@ -44,7 +44,7 @@ export default function EditProfile() {
         <input
           className="popup__input popup__input_type_name"
           id="owner-name"
-          maxLength="40"
+          maxLength="30"
           minLength="2"
           name="userName"
           placeholder="Nome"
@@ -61,7 +61,7 @@ export default function EditProfile() {
         <input
           className="popup__input popup__input_type_description"
           id="owner-description"
-          maxLength="200"
+          maxLength="30"
           minLength="2"
           name="userDescription"
           placeholder="Sobre mim"

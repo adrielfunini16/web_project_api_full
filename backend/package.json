@@ -1,5 +1,5 @@
 {
-  "name": "web_project_around_express",
+  "name": "web_project_api_full_backend",
   "version": "1.0.0",
   "description": "Back-end server for the Around the U.S project built with Node.js and Express",
   "main": "app.js",
@@ -12,14 +12,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/adrielfunini16/web_project_around_express.git"
+    "url": "git+https://github.com/adrielfunini16/web_project_api_full.git"
   },
   "author": "Adriel Funini",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/adrielfunini16/web_project_around_express/issues"
+    "url": "https://github.com/adrielfunini16/web_project_api_full/issues"
   },
-  "homepage": "https://github.com/adrielfunini16/web_project_around_express#readme",
+  "homepage": "https://github.com/adrielfunini16/web_project_api_full#readme",
   "devDependencies": {
     "eslint": "^8.56.0",
     "eslint-config-airbnb-base": "^15.0.0",

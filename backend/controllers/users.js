@@ -1,6 +1,7 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const User = require('../models/user');
+const getJwtSecret = require('../utils/jwtSecret');
 
 const saltRounds = 10;
 
@@ -55,7 +56,7 @@ const login = async (req, res, next) => {
   try {
     const user = await User.findUserByCredentials(email, password);
 
-    const token = jwt.sign({ _id: user._id }, process.env.JWT_SECRET, {
+    const token = jwt.sign({ _id: user._id }, getJwtSecret(), {
       expiresIn: '7d',
     });
     res.send({ token });

@@ -1,7 +1,12 @@
 import ImagePopup from "../Popup/components/ImagePopup/ImagePopup";
+import { useContext } from "react";
+import CurrentUserContext from "../../../../contexts/CurrentUserContext";
 
 export default function Card(props) {
-  const { name, link, isLiked } = props.card;
+  const { name, link, likes, owner } = props.card;
+  const { currentUser } = useContext(CurrentUserContext);
+  const isLiked = likes.includes(currentUser._id);
+  const isOwner = owner === currentUser._id;
   const { onOpenPopup, onCardLike, onCardDelete } = props;
 
   const imageComponent = { children: <ImagePopup card={props.card} /> };
@@ -25,12 +30,12 @@ export default function Card(props) {
         alt={name}
         onClick={() => onOpenPopup(imageComponent)}
       />
-      <button
+      {isOwner && <button
         aria-label="Delete card"
         className="card__delete-button"
         type="button"
         onClick={() => handleDeleteClick()}
-      />
+      />}
       <div className="card__description">
         <h2 className="card__title">{name}</h2>
         <button

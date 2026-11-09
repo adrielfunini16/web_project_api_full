@@ -1,7 +1,7 @@
 import successIcon from "../../images/success-icon.svg";
 import errorIcon from "../../images/error-icon.svg";
 
-export default function InfoTooltip({ isSuccess, onClose }) {
+export default function InfoTooltip({ isSuccess, message, onClose }) {
   return (
     <div className="popup">
       <div className="popup__content">
@@ -18,9 +18,9 @@ export default function InfoTooltip({ isSuccess, onClose }) {
             src={isSuccess ? successIcon : errorIcon}
           />
           <h3 className="info-tooltip__title">
-            {isSuccess
+            {message || (isSuccess
               ? "Cadastro realizado com sucesso!"
-              : "Ops, algo deu errado! Por favor, tente novamente."}
+              : "Ops, algo deu errado! Por favor, tente novamente.")}
           </h3>
         </div>
       </div>

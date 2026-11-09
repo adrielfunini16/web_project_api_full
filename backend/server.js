@@ -2,11 +2,13 @@ require('dotenv').config();
 
 const app = require('./app');
 const mongooseConnect = require('./db');
+const getJwtSecret = require('./utils/jwtSecret');
 
 const PORT = process.env.PORT || 3000;
 
 async function startServer() {
   try {
+    getJwtSecret();
     await mongooseConnect();
 
     app.listen(PORT, () => {

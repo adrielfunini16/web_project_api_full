@@ -6,6 +6,15 @@
     "es2021": true,
   },
   "rules": {
+    "no-unused-vars": [
+      "error",
+      {
+        "vars": "all",
+        "args": "after-used",
+        "ignoreRestSiblings": true,
+        "argsIgnorePattern": "next",
+      },
+    ],
     "no-underscore-dangle": [
       "error",
       {

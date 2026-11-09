@@ -1,7 +1,6 @@
 const mongoose = require('mongoose');
 const { isCelebrateError } = require('celebrate');
 
-// eslint-disable-next-line no-unused-vars
 const errorHandler = (err, req, res, next) => {
   if (isCelebrateError(err)) {
     return res.status(400).json({ message: 'Dados inválidos fornecidos' });

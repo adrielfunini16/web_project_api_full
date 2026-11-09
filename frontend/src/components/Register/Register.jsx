@@ -59,6 +59,7 @@ export default function Register({ handleRegister }) {
                   value={data.password}
                   onChange={handleChange}
                   minLength={8}
+                  maxLength={30}
                   required
                   placeholder="Senha"
                 />

@@ -17,6 +17,12 @@ const {
 app.use(requestLogger);
 app.use(cors);
 app.use(express.json());
+// Temporária para a revisão TripleTen; remover após a aprovação.
+app.get('/crash-test', () => {
+  setTimeout(() => {
+    throw new Error('O servidor travará agora');
+  }, 0);
+});
 app.post('/signup', validationSignup, createUser);
 app.post('/signin', validationSignin, login);
 app.use(auth);

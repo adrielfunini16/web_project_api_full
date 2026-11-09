@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import CurrentUserContext from "../contexts/CurrentUserContext";
 import Header from "./Header/Header";
 import Main from "./Main/Main";
@@ -19,94 +19,130 @@ function App() {
   const [currentUser, setCurrentUser] = useState({});
   const [cards, setCards] = useState([]);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [jwt, setJwt] = useState(getToken);
+  const [isAuthLoading, setIsAuthLoading] = useState(() => Boolean(jwt));
   const [authUser, setAuthUser] = useState(null);
   const [infoTooltip, setInfoTooltip] = useState(null);
+  const authAttempt = useRef(0);
+
+  const showError = useCallback((error) => {
+    setInfoTooltip({ isSuccess: false, message: error.message });
+  }, []);
+
+  const handleLogout = useCallback(() => {
+    authAttempt.current += 1;
+    removeToken();
+    setJwt(null);
+    setIsLoggedIn(false);
+    setIsAuthLoading(false);
+    setAuthUser(null);
+    setCurrentUser({});
+    setCards([]);
+    setPopup(null);
+    setInfoTooltip(null);
+    navigate("/signin");
+  }, [navigate]);
+
+  const handleApiError = useCallback((error) => {
+    if (error.status === 401) handleLogout();
+    showError(error);
+  }, [handleLogout, showError]);
+
+  const handleAuthSuccess = useCallback((user) => {
+    setAuthUser(user);
+    setCurrentUser(user);
+    setIsLoggedIn(true);
+    navigate("/");
+  }, [navigate]);
 
   const handleRegister = (userData) => {
     register(userData)
       .then(() => {
-        setInfoTooltip(true);
+        setInfoTooltip({ isSuccess: true });
         navigate("/signin");
       })
-      .catch((err) => {
-        setInfoTooltip(false);
-        console.error(err.message);
-      });
+      .catch(showError);
   };
 
-  const handleAuthSuccess = (res) => {
-    setAuthUser(res.data);
-    setIsLoggedIn(true);
-    navigate("/");
-  };
-
-  const handleLogin = (userData) => {
-    authenticate(userData)
-      .then((data) => {
-        setToken(data.token);
-        return checkToken(data.token);
-      })
-      .then((res) => {
-        handleAuthSuccess(res);
-      })
-      .catch((err) => {
-        console.error(err.message);
-        if (err.source === "checkToken") {
-          handleLogout();
-        }
-      });
-  };
-
-  const handleLogout = () => {
-    removeToken();
-    setIsLoggedIn(false);
-    setAuthUser(null);
-    navigate("/signin");
+  const handleLogin = async (userData) => {
+    const attempt = ++authAttempt.current;
+    try {
+      const { token } = await authenticate(userData);
+      const user = await checkToken(token);
+      if (attempt !== authAttempt.current) return;
+      setToken(token);
+      setJwt(token);
+      handleAuthSuccess(user);
+    } catch (error) {
+      if (attempt === authAttempt.current) showError(error);
+    }
   };
 
   useEffect(() => {
     const token = getToken();
-    if (!token) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setIsAuthLoading(false);
-      return;
-    }
+    if (!token) return;
+    let active = true;
+    const attempt = authAttempt.current;
     checkToken(token)
-      .then((res) => {
-        handleAuthSuccess(res);
-      })
-      .catch((err) => {
-        console.error(err.message);
-
-        if (err.source === "checkToken") {
-          handleLogout();
+      .then((user) => {
+        if (active && attempt === authAttempt.current && getToken() === token) {
+          setJwt(token);
+          handleAuthSuccess(user);
         }
       })
+      .catch((error) => {
+        if (!active || attempt !== authAttempt.current || getToken() !== token) return;
+        if (error.status === 401 || error.status === 404) handleLogout();
+        showError(error);
+      })
       .finally(() => {
-        setIsAuthLoading(false);
+        if (active) setIsAuthLoading(false);
       });
-  }, []);
+    return () => { active = false; };
+  }, [handleAuthSuccess, handleLogout, showError]);
 
-  async function handleCardLike(card) {
-    const isLiked = card.isLiked;
-
-    await api
-      .changeLikeCardStatus(card._id, !isLiked)
-      .then((newCard) => {
-        setCards((state) =>
-          state.map((currentCard) =>
-            currentCard._id === card._id ? newCard : currentCard,
-          ),
+  useEffect(() => {
+    if (!isLoggedIn || !jwt) return;
+    let active = true;
+    const token = getToken();
+    api.getAppInfo()
+      .then(([userData, cardsData]) => {
+        if (!active || getToken() !== token) return;
+        setCurrentUser(userData);
+        setAuthUser(userData);
+        setCards(
+          [...cardsData].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
         );
       })
-      .catch((error) => console.error(error));
+      .catch((error) => {
+        if (active && getToken() === token) handleApiError(error);
+      });
+    return () => { active = false; };
+  }, [isLoggedIn, jwt, handleApiError]);
+
+  // Respostas de uma sessão encerrada não devem atualizar a sessão seguinte.
+  async function runPrivateAction(operation, onSuccess) {
+    const token = getToken();
+    try {
+      const result = await operation();
+      if (getToken() === token) onSuccess(result);
+    } catch (error) {
+      if (getToken() === token) handleApiError(error);
+    }
   }
 
-  async function handleCardDelete(card) {
-    await api.cardDelete(card._id);
-    setCards((state) =>
-      state.filter((currentCard) => currentCard._id !== card._id),
+  function handleCardLike(card) {
+    const isLiked = card.likes.includes(currentUser._id);
+    return runPrivateAction(
+      () => api.changeLikeCardStatus(card._id, !isLiked),
+      (newCard) => setCards((state) => state.map((item) => item._id === card._id ? newCard : item)),
+    );
+  }
+
+  function handleCardDelete(card) {
+    return runPrivateAction(
+      () => api.cardDelete(card._id),
+      () => setCards((state) => state.filter((item) => item._id !== card._id)),
     );
   }
 
@@ -118,53 +154,31 @@ function App() {
     setPopup(null);
   }
 
-  useEffect(() => {
-    if (!isLoggedIn) {
-      return;
-    }
-    (async () => {
-      await api.getAppInfo().then(([userData, cardsData]) => {
-        setCurrentUser(userData);
-        setCards(cardsData);
-      });
-    })();
-  }, [isLoggedIn]);
+  const handleUpdateUser = (data) => runPrivateAction(
+    () => api.editProfileData(data),
+    (user) => {
+      setCurrentUser(user);
+      setAuthUser(user);
+      handleClosePopup();
+    },
+  );
 
-  const handleUpdateUser = (data) => {
-    (async () => {
-      await api
-        .editProfileData(data)
-        .then((newData) => {
-          setCurrentUser(newData);
-          handleClosePopup();
-        })
-        .catch((error) => console.error(error));
-    })();
-  };
+  const handleUpdateAvatar = (data) => runPrivateAction(
+    () => api.updateAvatar(data),
+    (user) => {
+      setCurrentUser(user);
+      setAuthUser(user);
+      handleClosePopup();
+    },
+  );
 
-  const handleUpdateAvatar = (data) => {
-    (async () => {
-      await api
-        .updateAvatar(data)
-        .then((newData) => {
-          setCurrentUser(newData);
-          handleClosePopup();
-        })
-        .catch((error) => console.error(error));
-    })();
-  };
-
-  const handleAddPlaceSubmit = (data) => {
-    (async () => {
-      await api
-        .addNewCard(data)
-        .then((newCard) => {
-          setCards([newCard, ...cards]);
-          handleClosePopup();
-        })
-        .catch((error) => console.error(error));
-    })();
-  };
+  const handleAddPlaceSubmit = (data) => runPrivateAction(
+    () => api.addNewCard(data),
+    (newCard) => {
+      setCards((state) => [newCard, ...state]);
+      handleClosePopup();
+    },
+  );
 
   return (
     <CurrentUserContext.Provider
@@ -179,10 +193,10 @@ function App() {
         <LoadingScreen />
       ) : (
         <Routes>
-          <Route path="/signin" element={<Login handleLogin={handleLogin} />} />
+          <Route path="/signin" element={isLoggedIn ? <Navigate to="/" replace /> : <Login handleLogin={handleLogin} />} />
           <Route
             path="/signup"
-            element={<Register handleRegister={handleRegister} />}
+            element={isLoggedIn ? <Navigate to="/" replace /> : <Register handleRegister={handleRegister} />}
           />
           <Route
             path="/"
@@ -221,7 +235,8 @@ function App() {
       )}
       {infoTooltip !== null && (
         <InfoTooltip
-          isSuccess={infoTooltip}
+          isSuccess={infoTooltip.isSuccess}
+          message={infoTooltip.message}
           onClose={() => setInfoTooltip(null)}
         />
       )}
