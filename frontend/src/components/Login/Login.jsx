@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import Header from "../Header/Header";
 import useFormValidation from "../../hooks/useFormValidation";
 
-export default function Login({ handleLogin }) {
+export default function Login({ handleLogin, isLoginPending }) {
   const [data, setData] = useState({ email: "", password: "" });
   const { errors, isFormValid, handleInputValidity } = useFormValidation();
 
@@ -20,7 +20,7 @@ export default function Login({ handleLogin }) {
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    if (isFormValid) {
+    if (isFormValid && !isLoginPending) {
       handleLogin(data);
     }
   };
@@ -73,9 +73,9 @@ export default function Login({ handleLogin }) {
             <button
               className="auth__button"
               type="submit"
-              disabled={!isFormValid}
+              disabled={!isFormValid || isLoginPending}
             >
-              Entrar
+              {isLoginPending ? "Entrando..." : "Entrar"}
             </button>
           </form>
           <p className="auth__text">

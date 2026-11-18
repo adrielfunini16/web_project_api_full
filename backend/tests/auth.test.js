@@ -3,6 +3,7 @@ require('dotenv').config({ quiet: true });
 const mongoose = require('mongoose');
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
 const app = require('../app');
 const User = require('../models/user');
 
@@ -74,6 +75,11 @@ describe('POST /signup', () => {
     expect(response.body).toHaveProperty('avatar', newUser.avatar);
     expect(response.body).toHaveProperty('email', newUser.email);
     expect(response.body).not.toHaveProperty('password');
+    const saved = await User.findById(createdUserId).select('+password');
+    expect(saved.email).toBe(newUser.email);
+    expect(saved.password).not.toBe(newUser.password);
+    expect(await bcrypt.compare(newUser.password, saved.password)).toBe(true);
+    expect(JSON.stringify(response.body)).not.toContain(saved.password);
   });
 });
 
@@ -100,6 +106,25 @@ describe('POST /signup with invalid data', () => {
       'message',
       'Dados inválidos fornecidos',
     );
+  });
+
+  test.each([
+    ['email ausente', { password: 'Password123' }],
+    ['senha ausente', { email: 'invalid-signup@example.com' }],
+    ['email inválido', { email: 'invalido', password: 'Password123' }],
+    ['senha curta', { email: 'invalid-signup@example.com', password: '1234567' }],
+    ['senha longa', { email: 'invalid-signup@example.com', password: 'a'.repeat(31) }],
+    ['campo inesperado', { email: 'invalid-signup@example.com', password: 'Password123', role: 'admin' }],
+  ])('rejeita cadastro com %s antes de persistir', async (label, payload) => {
+    const createSpy = jest.spyOn(User, 'create');
+    try {
+      const response = await request(app).post('/signup').send(payload);
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ message: 'Dados inválidos fornecidos' });
+      expect(createSpy).not.toHaveBeenCalled();
+    } finally {
+      createSpy.mockRestore();
+    }
   });
 
   test('should return status 409 for duplicate email', async () => {
@@ -183,6 +208,7 @@ describe('POST /signin', () => {
     expect(response.body).toHaveProperty('token');
     expect(typeof response.body.token).toBe('string');
     expect(response.body.token.length).toBeGreaterThan(0);
+    expect(Object.keys(response.body)).toEqual(['token']);
 
     const decoded = jwt.verify(response.body.token, process.env.JWT_SECRET);
     expect(decoded._id).toBe(createdUserId);

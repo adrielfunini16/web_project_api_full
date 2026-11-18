@@ -14,7 +14,7 @@ export default function EditProfile() {
     if (formRef.current) {
       validateForm(formRef.current);
     }
-  }, [name, description]);
+  }, [name, description, validateForm]);
 
   const handleNameChange = (event) => {
     setName(event.target.value);

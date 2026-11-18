@@ -23,7 +23,10 @@ function App() {
   const [isAuthLoading, setIsAuthLoading] = useState(() => Boolean(jwt));
   const [authUser, setAuthUser] = useState(null);
   const [infoTooltip, setInfoTooltip] = useState(null);
+  const [isLoginPending, setIsLoginPending] = useState(false);
+  const [isCardsLoading, setIsCardsLoading] = useState(true);
   const authAttempt = useRef(0);
+  const loginPending = useRef(false);
 
   const showError = useCallback((error) => {
     setInfoTooltip({ isSuccess: false, message: error.message });
@@ -31,6 +34,8 @@ function App() {
 
   const handleLogout = useCallback(() => {
     authAttempt.current += 1;
+    loginPending.current = false;
+    setIsLoginPending(false);
     removeToken();
     setJwt(null);
     setIsLoggedIn(false);
@@ -38,10 +43,10 @@ function App() {
     setAuthUser(null);
     setCurrentUser({});
     setCards([]);
+    setIsCardsLoading(true);
     setPopup(null);
     setInfoTooltip(null);
-    navigate("/signin");
-  }, [navigate]);
+  }, []);
 
   const handleApiError = useCallback((error) => {
     if (error.status === 401) handleLogout();
@@ -52,8 +57,7 @@ function App() {
     setAuthUser(user);
     setCurrentUser(user);
     setIsLoggedIn(true);
-    navigate("/");
-  }, [navigate]);
+  }, []);
 
   const handleRegister = (userData) => {
     register(userData)
@@ -65,9 +69,13 @@ function App() {
   };
 
   const handleLogin = async (userData) => {
+    if (loginPending.current) return;
+    loginPending.current = true;
+    setIsLoginPending(true);
     const attempt = ++authAttempt.current;
     try {
       const { token } = await authenticate(userData);
+      if (attempt !== authAttempt.current) return;
       const user = await checkToken(token);
       if (attempt !== authAttempt.current) return;
       setToken(token);
@@ -75,6 +83,11 @@ function App() {
       handleAuthSuccess(user);
     } catch (error) {
       if (attempt === authAttempt.current) showError(error);
+    } finally {
+      if (attempt === authAttempt.current) {
+        loginPending.current = false;
+        setIsLoginPending(false);
+      }
     }
   };
 
@@ -96,7 +109,9 @@ function App() {
         showError(error);
       })
       .finally(() => {
-        if (active) setIsAuthLoading(false);
+        if (active && attempt === authAttempt.current && getToken() === token) {
+          setIsAuthLoading(false);
+        }
       });
     return () => { active = false; };
   }, [handleAuthSuccess, handleLogout, showError]);
@@ -105,17 +120,20 @@ function App() {
     if (!isLoggedIn || !jwt) return;
     let active = true;
     const token = getToken();
-    api.getAppInfo()
-      .then(([userData, cardsData]) => {
-        if (!active || getToken() !== token) return;
-        setCurrentUser(userData);
-        setAuthUser(userData);
+    const attempt = authAttempt.current;
+    const isCurrentSession = () => active && attempt === authAttempt.current && getToken() === token;
+    api.getInitialCards()
+      .then((cardsData) => {
+        if (!isCurrentSession()) return;
         setCards(
           [...cardsData].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
         );
       })
       .catch((error) => {
-        if (active && getToken() === token) handleApiError(error);
+        if (isCurrentSession()) handleApiError(error);
+      })
+      .finally(() => {
+        if (isCurrentSession()) setIsCardsLoading(false);
       });
     return () => { active = false; };
   }, [isLoggedIn, jwt, handleApiError]);
@@ -123,11 +141,13 @@ function App() {
   // Respostas de uma sessão encerrada não devem atualizar a sessão seguinte.
   async function runPrivateAction(operation, onSuccess) {
     const token = getToken();
+    const attempt = authAttempt.current;
+    if (!token || !isLoggedIn) return;
     try {
       const result = await operation();
-      if (getToken() === token) onSuccess(result);
+      if (attempt === authAttempt.current && getToken() === token) onSuccess(result);
     } catch (error) {
-      if (getToken() === token) handleApiError(error);
+      if (attempt === authAttempt.current && getToken() === token) handleApiError(error);
     }
   }
 
@@ -172,13 +192,17 @@ function App() {
     },
   );
 
-  const handleAddPlaceSubmit = (data) => runPrivateAction(
-    () => api.addNewCard(data),
-    (newCard) => {
-      setCards((state) => [newCard, ...state]);
-      handleClosePopup();
-    },
-  );
+  // Aguarde a lista inicial para que ela não substitua um card recém-criado.
+  const handleAddPlaceSubmit = (data) => {
+    if (isCardsLoading) return;
+    return runPrivateAction(
+      () => api.addNewCard(data),
+      (newCard) => {
+        setCards((state) => [newCard, ...state]);
+        handleClosePopup();
+      },
+    );
+  };
 
   return (
     <CurrentUserContext.Provider
@@ -193,7 +217,7 @@ function App() {
         <LoadingScreen />
       ) : (
         <Routes>
-          <Route path="/signin" element={isLoggedIn ? <Navigate to="/" replace /> : <Login handleLogin={handleLogin} />} />
+          <Route path="/signin" element={isLoggedIn ? <Navigate to="/" replace /> : <Login handleLogin={handleLogin} isLoginPending={isLoginPending} />} />
           <Route
             path="/signup"
             element={isLoggedIn ? <Navigate to="/" replace /> : <Register handleRegister={handleRegister} />}
@@ -213,6 +237,7 @@ function App() {
                     onClosePopup={handleClosePopup}
                     popup={popup}
                     cards={cards}
+                    isCardsLoading={isCardsLoading}
                     onCardLike={handleCardLike}
                     onCardDelete={handleCardDelete}
                   />

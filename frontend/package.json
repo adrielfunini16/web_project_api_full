@@ -8,8 +8,9 @@
     "build": "vite build",
     "build:vm": "vite build --mode vm",
     "lint": "eslint .",
+    "test": "vitest run",
     "preview": "vite preview",
-    "deploy": "npm run build:vm && scp -r -i ~/.ssh/google_cloud_ed25519 ./dist/* adrielfunini16@around.clux.com:~/web_project_around_auth/"
+    "deploy": "npm run build:vm && scp -r -i ~/.ssh/google_cloud_ed25519 ./dist/* adrielfunini16@around.clux.com:~/web_project_around_frontend/"
   },
   "dependencies": {
     "react": "^19.2.8",
@@ -18,6 +19,9 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.9",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.4",
@@ -25,6 +29,8 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",
     "globals": "^17.7.0",
-    "vite": "^8.2.0"
+    "jsdom": "^29.1.1",
+    "vite": "^8.2.0",
+    "vitest": "^5.1.0"
   }
 }

@@ -7,7 +7,7 @@ import Card from "./components/Card/Card";
 import CurrentUserContext from "../../contexts/CurrentUserContext";
 
 export default function Main(props) {
-  const { onOpenPopup, onClosePopup, popup, cards, onCardLike, onCardDelete } =
+  const { onOpenPopup, onClosePopup, popup, cards, isCardsLoading, onCardLike, onCardDelete } =
     props;
   const { currentUser } = useContext(CurrentUserContext);
 
@@ -43,6 +43,7 @@ export default function Main(props) {
         </div>
         <button
           aria-label="Adicionar cartão"
+          disabled={isCardsLoading}
           className="profile__add-button"
           type="button"
           onClick={() => onOpenPopup(newCardPopup)}

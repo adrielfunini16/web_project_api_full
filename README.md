@@ -62,7 +62,7 @@ The repository has separate `frontend/` and `backend/` applications, each with i
 | Database | MongoDB |
 | Authentication and validation | bcrypt, jsonwebtoken, Celebrate/Joi, validator, cors |
 | Logging | Winston and express-winston; JSON request and error logs |
-| Testing and quality | Jest, Supertest, ESLint; Airbnb Base configuration in the backend |
+| Testing and quality | Vitest, React Testing Library, Jest, Supertest, ESLint; Airbnb Base configuration in the backend |
 | Deployment | Google Cloud Compute Engine, Ubuntu 22.04 LTS, Nginx, PM2, Certbot, HTTPS/TLS, DNS |
 | Development | npm, Nodemon, Git and GitHub; Chrome DevTools for manual integration checks |
 
@@ -179,6 +179,7 @@ Unknown routes pass through authentication first: without a valid token, they ca
 - Passwords are hashed with bcrypt using a cost factor of 10. The Mongoose password field has `select: false`; login explicitly selects it for verification, while registration excludes it from the response.
 - JWTs carry the user's `_id` and expire after seven days. Middleware verifies the token before protected resource handlers run.
 - The client keeps the JWT in React state and `localStorage`, verifies it through `/users/me`, and clears session state and local storage on logout. Guards prevent responses from a previous session from updating the next session.
+- Login reuses the user returned by token verification instead of requesting the profile again: one `/signin`, one `/users/me`, and one initial `/cards` request. Reload restores the session through token verification. Pending-login and initial-card-loading guards prevent duplicate submissions and conflicting initial updates; stale responses are ignored after logout or account changes.
 - Profile updates use the authenticated user's ID. Card deletion checks ownership on the server; repeated likes use MongoDB `$addToSet`, and unlikes use `$pull`.
 - Celebrate/Joi validates requests before controllers, with model validation as an additional layer. Centralized error handling returns controlled messages.
 - CORS defaults to the deployed frontend in production and `http://localhost:5173` otherwise. CORS is a browser policy, not a replacement for API authentication.
@@ -186,11 +187,59 @@ Unknown routes pass through authentication first: without a valid token, they ca
 
 This is an educational full-stack application, not a claim of complete security assurance. Tokens in `localStorage` remain accessible to scripts running on the same origin. Logout removes the client copy; it does not revoke an already-issued JWT on the server.
 
+### Dependency maintenance and residual risk — 18 Nov 2026
+
+The local Sprint 18 changes include backend updates to body-parser 2.4.0, Mongoose 9.11.4, and qs 6.17.1. The final frontend maintenance updated Vite 8.2.1 → 8.3.8, Vitest 5.1.0 → 5.1.1, ESLint 10.8.0 → 10.15.0, nanoid 3.3.17 → 3.3.20, source-map-js 1.2.1 → 1.2.2, Zod 4.4.3 → 4.6.7, and brace-expansion 5.0.9 → 5.0.13 within existing dependency ranges. React and the application contracts were preserved. No forced audit fix, major migration, or dependency override was applied.
+
+| npm audit scope | Before final maintenance | After final maintenance |
+| --- | --- | --- |
+| Frontend production | 0 | 0 |
+| Frontend development | 12 (9 high, 3 moderate) | 6 high |
+| Backend production | 2 high | 2 high |
+| Backend development | 41 (36 high, 5 moderate) | 41 (36 high, 5 moderate) |
+
+Counts represent affected package entries, including propagated dependency findings, rather than independent exploitable flaws. Development counts are the full audit minus the production-only audit. Run `npm audit` and `npm audit --omit=dev` separately in each application to refresh these time-sensitive results.
+
+Celebrate remains at 15.0.3 because it requires Lodash `4.17.x`; the latest published patch in that range is still 4.17.23. Its production findings include:
+
+- [GHSA-r5fr-rjxr-66jc](https://github.com/advisories/GHSA-r5fr-rjxr-66jc): high-severity code injection when untrusted keys reach `_.template` imports; previously polluted prototype keys can also reach template compilation. The fix starts at Lodash 4.18.0.
+- [GHSA-f23m-r3pf-42rh](https://github.com/advisories/GHSA-f23m-r3pf-42rh): array-wrapped attacker-controlled paths passed to `_.unset`, `_.omit`, or `_.pullAt` can delete prototype properties. Lodash 4.18.1 fixes this bypass.
+
+In the inspected application, Celebrate uses `get`, `curry`, and `flip`, rather than those vulnerable operations. express-winston has a static `HTTP request` message, empty request/response whitelists, and developer-controlled options; no HTTP-controlled template imports or deletion paths were identified. This is evidence of reduced reachability, not proof that the dependency is safe or a substitute for patching.
+
+Recommendation: a backend release can be considered only with the owner's explicit acceptance of this documented residual risk and the current static logging configuration preserved. Without that acceptance or a compatible remediation, hold the backend release. A future authorized Celebrate 16 migration must assess CommonJS/ESM interoperability and Joi 18 schema behavior, preserve the existing `400` / `{ message }` validation contract and error classification, rerun all backend tests, and recheck remaining Lodash consumers such as express-winston.
+
+Development findings remain in Picomatch and its Vite/Vitest/Jest/Nodemon dependency chains, plus backend Glob/Minimatch chains. [GHSA-fc5q-39xc-vjpf](https://github.com/advisories/GHSA-fc5q-39xc-vjpf) concerns regular-expression denial of service through crafted extglob patterns; npm still listed 4.0.7 as the latest Picomatch release, and that version is affected. No downgrade or risky override was used to suppress audit counts. Keep development servers local, do not process untrusted projects/glob patterns with these tools, and exclude development dependencies from the production backend installation. These measures reduce exposure but do not patch the packages.
+
+These changes and checks are local. They do not indicate that production has been updated.
+
 ## Testing and verification
+
+### Automated frontend tests
+
+Five Vitest suites use React Testing Library, user-event, and jsdom:
+
+| Suite | Scope |
+| --- | --- |
+| `auth.test.jsx` | Registration, validation through typing, login failures, JWT verification, and duplicate-submit prevention |
+| `session.test.jsx` | Reload, logout, account changes, stale responses, and StrictMode behavior |
+| `cards.test.jsx` | Initial loading, creation, likes, deletion, ownership controls, and failures |
+| `users.test.jsx` | Profile/avatar updates, validation, errors, and stale updates |
+| `apiClient.test.js` | URLs, authorization headers, response parsing, and error normalization |
+
+Run from `frontend/`:
+
+```bash
+npm test
+npm run lint
+npm run build:vm
+```
+
+Tests mock every Fetch request and never fall back to the deployed API. Cleanup unmounts components, restores stubbed globals, and clears local storage. A single worker limits jsdom resource contention. Credential setup uses paste; tests that exercise typing still use user-event typing. No test timeout or assertion was weakened. These are component/integration tests, not automated browser E2E tests; no coverage percentage is claimed.
 
 ### Automated backend tests
 
-Five Jest/Supertest suites are present:
+Six Jest/Supertest suites are present:
 
 | Suite | Scope |
 | --- | --- |
@@ -199,6 +248,7 @@ Five Jest/Supertest suites are present:
 | `cards.test.js` | Creation, shared reads, ownership, likes, persistence, and simulated failures |
 | `cors.test.js` | Environment-specific origins, custom origins, preflight, and protected routes |
 | `logger.test.js` | JSON metadata, error categories, and exclusion of sensitive data |
+| `routes.test.js` | Unknown-route behavior and confirmation that the temporary `/crash-test` route was removed |
 
 Run from `backend/`, with local MongoDB running. The following command generates a temporary signing secret for the test process without printing it:
 
@@ -215,15 +265,20 @@ Run `npm run lint` separately inside `backend/` and `frontend/`.
 
 ### Verification record
 
-**100 backend tests passed across five Jest/Supertest suites** in the recorded local run. Production API checks also verified authentication, validation, resource ownership, and data operations; a controlled recovery test verified automatic PM2 restart. These are separate test activities, not a claim of full automated browser E2E coverage.
+The last confirmed backend run passed **109 tests across six Jest/Supertest suites**. It is reused here because the final maintenance did not change backend code or dependencies. Historical production checks below are separate evidence; no production access or deployment was performed during this maintenance.
 
 | Evidence | Result and scope |
 | --- | --- |
-| Historical local test run | Five suites and 100 tests passed, as recorded in the supplied pre-deployment audit summary; not rerun for this documentation update |
-| Historical lint/build checks | Reported as successful in the supplied audit summary, with an existing frontend warning; not a new clean-run claim |
+| Frontend complete run 1 — 18 Nov 2026 | 55 passed, 0 failed, 0 skipped across five suites (95.50 s) |
+| Frontend complete run 2 — 18 Nov 2026 | 53 passed, 2 failed by the existing 5 s timeout, 0 skipped across five suites (83.12 s) |
+| Backend automated tests | 109 passed, 0 failed, 0 skipped across six suites in the preceding confirmed run; unchanged backend, not rerun on 18 Nov |
+| Frontend and backend ESLint — 18 Nov 2026 | Both passed with 0 errors and 0 warnings |
+| VM build — 18 Nov 2026 | `npm run build:vm` passed with Vite 8.3.8; local artifact only, not deployed |
 | Production API QA — 11 Nov 2026 | Work verified registration `201`, duplicate email `409`, rejected authentication `401`, unauthorized deletion `403`, validation `400/404`, profiles, cards, and likes. Two temporary cards were deleted afterward |
 | Developer's manual production checks | Registration/login, profile/avatar edits, card operations, likes, reload persistence, shared gallery, ownership controls, logout, and token removal were reported as tested with multiple accounts and Chrome DevTools |
 | Controlled recovery test — 11 Nov 2026 | The developer reported a temporary `502`, PM2 restart count increasing from 2 to 3, process returning online, and a subsequent unauthenticated `/users/me` request returning `401` |
+
+Frontend stability is **not established**. In the second complete run, both `session.test.jsx` scenarios named `resposta de perfil antiga (success/401) não afeta novo login com o mesmo JWT` timed out: they submit a pending profile update, log out, log in again with the same JWT, and then resolve the old response. The originally reported duplicate-login test passed in both complete runs and in an isolated check after the Vitest patch update. Earlier isolated attempts on Vitest 5.1.0 failed to start the forks worker; they executed no tests. No application defect or single root cause for the timing failures has been demonstrated. The suite already awaits user interactions, resolves deferred responses with `act`, cleans up between tests, and uses one worker; timeout cancellation of pending interactions remains a diagnostic concern, not a confirmed explanation for these two failures. Preserve typing and assertions, instrument the failing scenario's await boundaries in a future diagnostic run, and establish two passing sequential complete runs before publication.
 
 The production API audit did **not** certify a complete browser E2E flow: logout, `InfoTooltip`, and mobile behavior remained unverified by Work. No availability metric, CI status, or automated browser E2E coverage is claimed.
 
@@ -250,7 +305,7 @@ This runs `vite build --mode vm` and writes `dist/` with the base path `/`. Plai
 
 `npm run preview -- --mode vm` serves the built files locally; it does not start the backend or reproduce the production infrastructure. Production builds default to the production API, whose CORS policy does not allow the preview origin by default. Use the development workflow above for local integration work.
 
-The existing `deploy` npm script combines the VM build with an owner-specific SCP destination. It is not a general setup command and should only be used after its target has been reviewed by the deployment owner.
+The existing `deploy` npm script combines the VM build with the owner-specific SCP destination `~/web_project_around_frontend/` (`/home/adrielfunini16/web_project_around_frontend`). The script was preserved. It is not a general setup command; publication remains blocked by the frontend stability result above, and backend publication additionally requires the residual-risk decision described above. No commit, push, or deployment was performed for this maintenance.
 
 <details>
 <summary>Deployment resource note</summary>
